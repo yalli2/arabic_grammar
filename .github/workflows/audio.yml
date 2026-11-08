@@ -1,0 +1,42 @@
+name: Generate Arabic audio
+
+on:
+  push:
+    branches: [main]
+    paths: ['data/ch*.js', 'tools/**', '.github/workflows/audio.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: audio
+  cancel-in-progress: false
+
+jobs:
+  tts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build index and text list
+        run: node tools/build.js
+      - name: Generate native Arabic voices (edge-tts)
+        run: |
+          pip install edge-tts==7.*
+          python tools/gen_audio.py
+      - name: Commit audio
+        run: |
+          git config user.name "audio-bot"
+          git config user.email "audio-bot@users.noreply.github.com"
+          git add -A audio data/index.js
+          git diff --cached --quiet && exit 0
+          git commit -m "Update Arabic audio"
+          git pull --rebase origin main
+          git push
